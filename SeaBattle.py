@@ -11,10 +11,42 @@ ABOUT_ME = ['My name is Max Siomin',
             'Diligent and hardworking',
             'I love the x y coordinate system']
 
+MODES = ['EASY', 'NORMAL', 'HARD', 'EXTREME']
+
+
 class Game:
     def __init__(self) -> None:
-        pass
+        self.stdscr = curses.initscr()
 
+    def choose_mode(self):
+        curses.curs_set(0)
+        curses.start_color()
+        curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        self.stdscr.border()
+        current_row = 0
+        Menu()._print_menu(current_row, MODES)
+        while True:
+            h, w = self.stdscr.getmaxyx()
+            x = w//2 - 5
+            y = h//4
+            self.stdscr.addstr(y, x, 'CHOOSE MODE')
+            self.stdscr.keypad(1)
+            key = self.stdscr.getch()
+            if key in (curses.KEY_UP, ord('w')) and current_row > 0:
+                current_row -= 1
+            if key in (curses.KEY_DOWN, ord('s')) and current_row < len(MODES) - 1:
+                current_row += 1
+            if key == curses.KEY_ENTER or key in [10, 13]:
+                if current_row == 0:
+                    Menu()._print_center('EASY')
+                elif current_row == 1:
+                    Menu()._print_center('NORMAL')
+                elif current_row == 2:
+                    Menu()._print_center('HARD')
+                if current_row == len(MODES) - 1:
+                    Menu()._print_center('EXTREME')
+                self.stdscr.getch()
+            Menu()._print_menu(current_row, MODES)
 
 
 class Menu:
@@ -30,6 +62,10 @@ class Menu:
         current_row = 0
         self._print_menu(current_row, menu)
         while True:
+            h, w = self.stdscr.getmaxyx()
+            x = w//2 - 5
+            y = h//4
+            self.stdscr.addstr(y, x, 'SEA BATTLE')
             self.stdscr.keypad(1)
             key = self.stdscr.getch()
             if key in (curses.KEY_UP, ord('w')) and current_row > 0:
@@ -38,7 +74,7 @@ class Menu:
                 current_row += 1
             if key == curses.KEY_ENTER or key in [10, 13]:
                 if current_row == 0:
-                    self._print_center("You won 1")
+                    Game().choose_mode()
                 elif current_row == 1:
                     self._print_rules()
                 elif current_row == 2:
@@ -98,4 +134,5 @@ class Menu:
         self.stdscr.refresh()
 
 
-Menu()._start()
+if __name__ == '__main__':
+    Menu()._start()
