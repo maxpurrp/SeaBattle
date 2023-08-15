@@ -1,48 +1,95 @@
 import pygame
-from config import RULES, ABOUT_ME, MODES, MENU, HEIGHT, WIDGHT, NAME
+from config import RULES, ABOUT_ME, MODES, MENU, HEIGHT, WIDGHT, NAME, WHITE, BLACK, SHIPS
+
 
 class Game:
-    def __init__(self) -> None:
+    def __init__(self, mode) -> None:
         self.game = pygame
         self.game.init()
         self.screen = pygame.display.set_mode((HEIGHT, WIDGHT), flags=pygame.NOFRAME)
         self.user_fild = self.game.draw.rect(self.screen, (71, 76, 112), (15, 15, 260, 260))
-        self.surface = self.game.font.SysFont('arial', 15)
-        self.letters = [self.surface.render(elem, True, (255, 255, 255)) for elem in 'ABCDEFGHIJ']
-        self.nums = [self.surface.render(str(elem), True, (255, 255, 255)) for elem in [1,2,3,4,5,6,7,8,9,10]]
-        self.widght = self.height = 14
-        self.magrin = 10
+        self.surface = self.game.font.SysFont('arial', 18)
+        self.mode = mode
+        self.letters = [self.surface.render(elem, True,
+                                        (255, 255, 255)) for elem in 'ABCDEFGHIJ']
+        self.nums = [self.surface.render(str(elem), True,
+                                         (255, 255, 255)) for elem in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]
+        self.ships = SHIPS
+        self.block_size = 24
+        self.left_marg = 40
+        self.upper_marg = 50
+        self.menu_ind = 0
+        self.font_size = int(self.block_size / 1.5)
+        self.font = self.game.font.SysFont('notosize', self.font_size)
 
-    def start(self, mode):
-        limiter_letter = 0
-        limiter_nums = 0
-        print(mode)
-        self.screen.fill((0, 0, 0))
-        self.game.draw.rect(self.screen, (71, 76, 112), (20, 25, 290, 260), 2)
-        self.game.draw.rect(self.screen, (71, 76, 112), (20, 330, 290, 260), 2)
+    def start(self):
         while True:
             for event in pygame.event.get():
                 if event.type == self.game.KEYDOWN:
                     if event.key == self.game.K_BACKSPACE:
                         exit()
-            for col in range(10):
-                for row in range(10):
-                    x = col * self.widght + (col + 1) * self.magrin
-                    y = row * self.height + (row + 1) * self.magrin
-                    # x = 24 ->
-                    # y = 24  ^
-                    self.game.draw.rect(self.screen, (120, 18, 18), (x + 45, y + 35, self.widght, self.height), 2)
-                    self.game.draw.rect(self.screen, (14, 21, 66), (x + 45, y + 340, self.widght, self.height), 2)
-                    if limiter_letter != 10:
-                        self.screen.blit(self.letters[row], (x + 20, y + 30))
-                        self.screen.blit(self.letters[row], (x + 20, y + 335))
-                        limiter_letter += 1
-                if limiter_nums != 10:
-                    self.screen.blit(self.nums[col], (x + 45, 25))
-                    self.screen.blit(self.nums[col], (x + 45, 330))
+                    if event.key == self.game.K_w or event.key == self.game.K_UP:
+                        self._switch_ind(-1)
+                    if event.key == self.game.K_s or event.key == self.game.K_DOWN:
+                        self._switch_ind(1)
+                    if event.key == self.game.K_RETURN:
+                        #print(self.menu_ind)
+                        self.ships[list(self.ships.keys())[self.menu_ind]] = self.ships[list(self.ships.keys())[self.menu_ind]] - 1
 
-
+            self.screen.fill(BLACK)
+            self.draw_field()
+            self.select_ship()
             self.game.display.update()
+
+    def select_ship(self):
+        for i, ship in enumerate(self.ships.keys()):
+            count_ships = self.ships[ship]
+            if count_ships > 0:
+                ship = self.surface.render(f'{count_ships}x {ship}', True, WHITE)
+            else:
+                ship = self.surface.render(f'{ship} is on field', True, WHITE)
+            ship_rect = ship.get_rect()
+            ship_rect.center = (700, 330 + i * 25)
+            if i == self.menu_ind:
+                self.game.draw.rect(self.screen, (96, 116, 120), ship_rect)
+            self.screen.blit(ship, ship_rect)
+
+    def draw_field(self):
+        letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+        title = self.font.render(self.mode, 1, WHITE)
+        for y in range(11):
+            for x in range(11):
+                # first field
+                self.game.draw.line(self.screen, WHITE, (self.left_marg,self.upper_marg + y * self.block_size),
+                                    (self.left_marg + 10 * self.block_size, self.upper_marg + y * self.block_size), 1)
+                self.game.draw.line(self.screen, WHITE, (self.left_marg + x * self.block_size,self.upper_marg),
+                                    (self.left_marg + x * self.block_size,self.upper_marg + 10 * self.block_size), 1)
+                # second field
+                self.game.draw.line(self.screen, WHITE, (self.left_marg,(self.upper_marg + y * self.block_size) + 12 * self.block_size),
+                                    (self.left_marg + 10 * self.block_size, (self.upper_marg + y * self.block_size)+ 12 * self.block_size), 1)
+                self.game.draw.line(self.screen, WHITE, (self.left_marg + x * self.block_size,self.upper_marg + 12 * self.block_size),
+                                    (self.left_marg + x * self.block_size,self.upper_marg + 22 * self.block_size), 1)
+            if y < 10:
+                num = self.font.render(str(y + 1), 1, WHITE)
+                char = self.font.render(letters[y], 1, WHITE)
+                
+                num_widht = num.get_width()
+                num_height = num.get_height()
+
+                char_widht = char.get_width()
+                # first field
+                self.screen.blit(num, (self.left_marg - (self.block_size//2 + num_widht // 2), self.upper_marg + y * self.block_size + (self.block_size // 2 - num_height // 2)))
+                self.screen.blit(char, (self.left_marg + y *self.block_size + (self.block_size // 2 - char_widht // 2), (self.upper_marg + 10 * self.block_size) + 5))
+                # second field
+                self.screen.blit(num, (self.left_marg - (self.block_size//2 + num_widht // 2), (self.upper_marg + y * self.block_size + (self.block_size // 2 - num_height // 2) + 12 * self.block_size)))
+                self.screen.blit(char, (self.left_marg + y *self.block_size + (self.block_size // 2 - char_widht // 2), ((self.upper_marg + 10 * self.block_size) + 5) + 12 * self.block_size))
+        title = self.surface.render(f'MODE : {self.mode}', 1, WHITE)
+        head = title.get_rect()
+        head.center = (HEIGHT // 2, WIDGHT // 10)
+        self.screen.blit(title, head)
+
+    def _switch_ind(self, num):
+        self.menu_ind = max(0, min(self.menu_ind + num, len(self.ships) - 1))
 
 
 class Menu:
@@ -87,8 +134,9 @@ class Menu:
                         elif self.current_ind == 3:
                             self.game.quit()
                             exit()
-            self.screen.fill((0, 0, 0))
-            self._menu(self.screen)
+
+            self.screen.fill(BLACK)
+            self._menu()
             pygame.display.flip()
 
     def select_mode(self, surf):
@@ -103,7 +151,7 @@ class Menu:
                     if event.key == self.game.K_s or event.key == self.game.K_DOWN:
                         self._switch(1)
                     if event.key == self.game.K_RETURN:
-                        Game().start(MODES[self.current_ind])
+                        Game(MODES[self.current_ind]).start()
 
             self.screen.fill((0, 0, 0))
             head = self.head.get_rect()
@@ -138,22 +186,21 @@ class Menu:
     def _switch(self, direction):
         self.current_ind = max(0, min(self.current_ind + direction, len(self.options) - 1))
 
-    def _menu(self, surf):
+    def _menu(self):
         title = self.title.get_rect()
         title.center = (HEIGHT // 2, WIDGHT // 10)
-        self.game.draw.rect(surf, (0, 0, 0), title)
-        surf.blit(self.title, title)
+        self.game.draw.rect(self.screen, BLACK, title)
+        self.screen.blit(self.title, title)
         for i, option in enumerate(self.options):
             option_rect = option.get_rect()
             option_rect.center = (HEIGHT // 2, (WIDGHT // 3) + i * 75)
             if i == self.current_ind:
-                self.game.draw.rect(surf, (96, 116, 120), option_rect)
-            surf.blit(option, option_rect)
+                self.game.draw.rect(self.screen, (96, 116, 120), option_rect)
+            self.screen.blit(option, option_rect)
 
 
 def main():
-    cur = Menu()
-    cur.start()
+    Menu().start()
 
 
 if __name__ == '__main__':
