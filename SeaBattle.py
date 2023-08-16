@@ -11,7 +11,7 @@ class Game:
         self.surface = self.game.font.SysFont('arial', 18)
         self.mode = mode
         self.letters = [self.surface.render(elem, True,
-                                        (255, 255, 255)) for elem in 'ABCDEFGHIJ']
+                                            (255, 255, 255)) for elem in 'ABCDEFGHIJ']
         self.nums = [self.surface.render(str(elem), True,
                                          (255, 255, 255)) for elem in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]
         self.ships = SHIPS
@@ -21,8 +21,11 @@ class Game:
         self.menu_ind = 0
         self.font_size = int(self.block_size / 1.5)
         self.font = self.game.font.SysFont('notosize', self.font_size)
+        self.ships_on_fiend = []
 
     def start(self):
+        self.screen.fill(BLACK)
+        self.draw_field()
         while True:
             for event in pygame.event.get():
                 if event.type == self.game.KEYDOWN:
@@ -33,21 +36,63 @@ class Game:
                     if event.key == self.game.K_s or event.key == self.game.K_DOWN:
                         self._switch_ind(1)
                     if event.key == self.game.K_RETURN:
-                        #print(self.menu_ind)
+                        self.draw_ship(4 - self.menu_ind)
                         self.ships[list(self.ships.keys())[self.menu_ind]] = self.ships[list(self.ships.keys())[self.menu_ind]] - 1
 
-            self.screen.fill(BLACK)
-            self.draw_field()
+
             self.select_ship()
             self.game.display.update()
 
+    def draw_ship(self, ship):
+        print(ship)
+        x, y = self.left_marg, self.upper_marg + 12 * self.block_size
+        while True:
+            start_pos = self.game.Rect(x, y ,self.block_size * ship + 1,self.block_size + 1)
+            for event in self.game.event.get():
+                if event.type == self.game.KEYDOWN:
+                    if event.key == self.game.K_BACKSPACE:
+                        self.draw_field()
+                        return
+                    if event.key == self.game.K_LEFT or event.key == self.game.K_a:
+                        if x <= 40:
+                            pass
+                        else:
+                            x -= 24
+                    if event.key == self.game.K_RIGHT or event.key == self.game.K_d:
+                        if x + (ship - 1) * self.block_size >= 256:
+                            pass
+                        else:
+                            x += 24
+                    if event.key == self.game.K_w or event.key == self.game.K_UP:
+                        if y <= 338:
+                            pass
+                        else:
+                            y -= 24
+                    if event.key == self.game.K_s or event.key == self.game.K_DOWN:
+                        if y >= 554:
+                            pass
+                        else:
+                            y += 24
+                    if event.key == self.game.K_RETURN:
+                        # coordinate
+                        print((x // 24, (y  // 24) - 13), ((x // 24) + ship - 1, (y  // 24) - 13)) # from to
+                        self.ships_on_fiend.append(start_pos)
+                        self.draw_field()
+                        return
+
+            self.draw_field()
+            self.game.draw.rect(self.screen, (255, 0, 0), self.game.Rect(start_pos), 1)
+            self.game.display.update()
+
     def select_ship(self):
-        for i, ship in enumerate(self.ships.keys()):
+        self.game.draw.rect(self.screen, BLACK, (600, 300, 800, 800))
+        for i, ship in enumerate(list(self.ships.keys())):
             count_ships = self.ships[ship]
             if count_ships > 0:
                 ship = self.surface.render(f'{count_ships}x {ship}', True, WHITE)
             else:
-                ship = self.surface.render(f'{ship} is on field', True, WHITE)
+                #self.ships.pop(ship)
+                continue
             ship_rect = ship.get_rect()
             ship_rect.center = (700, 330 + i * 25)
             if i == self.menu_ind:
@@ -87,6 +132,15 @@ class Game:
         head = title.get_rect()
         head.center = (HEIGHT // 2, WIDGHT // 10)
         self.screen.blit(title, head)
+        if self.ships_on_fiend:
+            for elem in self.ships_on_fiend:
+                elem[0] += 1
+                elem[1] += 1
+                elem[2] -= 2
+                elem[3] -= 2
+                self.game.draw.rect(self.screen, (105, 128, 255), elem)
+        if len(self.ships_on_fiend) == 10:
+            print('lets go')
 
     def _switch_ind(self, num):
         self.menu_ind = max(0, min(self.menu_ind + num, len(self.ships) - 1))
