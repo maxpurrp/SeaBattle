@@ -1,6 +1,7 @@
 import pygame
-from config import RULES, ABOUT_ME, MODES, MENU, HEIGHT, WIDGHT, NAME, WHITE, BLACK, SHIPS
+from config import RULES, ABOUT_ME, MODES, MENU, POSITIONS, HEIGHT, WIDGHT, NAME, WHITE, BLACK, SHIPS, HELP_MESSAGE_1, HELP_MESSAGE_2
 from time import sleep
+import random
 
 
 class Game:
@@ -11,45 +12,98 @@ class Game:
         self.screen = pygame.display.set_mode((HEIGHT, WIDGHT))#, flags=pygame.NOFRAME)
         self.user_fild = self.game.draw.rect(self.screen, (71, 76, 112), (15, 15, 260, 260))
         self.surface = self.game.font.SysFont('arial', 18)
+        self.options = self.game.font.SysFont('arial', 30)
         self.mode = mode
         self.letters = [self.surface.render(elem, True,
                                             (255, 255, 255)) for elem in 'ABCDEFGHIJ']
         self.nums = [self.surface.render(str(elem), True,
                                          (255, 255, 255)) for elem in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]
         self.info = self.surface.render('Incorrect Position', True, (115, 7, 7))
+        self.choose_optns = [self.options.render(elem, True, (255, 255, 255)) for elem in POSITIONS]
+        self.first_help_message = self.surface.render(HELP_MESSAGE_1, True, WHITE)
+        self.first_help_mes_on_field = self.surface.render(HELP_MESSAGE_2, True, WHITE)
         self.ships = SHIPS
         self.field_size = 10
         self.block_size = 24
         self.left_marg = 40
         self.upper_marg = 50
         self.user_size = 13
+        self.opt_ind = 0
         self.menu_ind = 0
+        self.player_mode = 0
         self.font_size = int(self.block_size / 1.5)
         self.font = self.game.font.SysFont('notosize', self.font_size)
         self.ships_on_fiend_rect = []
+        self.bot_ships_on_field_rect = []
         self.ships_coodrinate = []
+        self.bot_ships_coodrinate = []
 
     def start(self):
         self.screen.fill(BLACK)
-        self.draw_field()
-        while True:
-            for event in pygame.event.get():
+        self.player_mode = self.choose_positions()
+        self.screen.fill(BLACK)
+        if self.player_mode == 0:
+            self.generate_ship(True)
+            self.generate_ship(False)
+            print('lets go')
+            self.start_match()
+        else:
+            self.generate_ship(False)
+            self.draw_field()
+            while True:
+                for event in pygame.event.get():
+                    if event.type == self.game.KEYDOWN:
+                        if event.key == self.game.K_BACKSPACE:
+                            exit()
+                        if event.key == self.game.K_w or event.key == self.game.K_UP:
+                            self.menu_ind = self._switch_ind(self.menu_ind, -1, self.ships)
+                        if event.key == self.game.K_s or event.key == self.game.K_DOWN:
+                            self.menu_ind = self._switch_ind(self.menu_ind, 1, self.ships)
+                        if event.key == self.game.K_RETURN:
+                            self.screen.fill(BLACK, help_message)
+                            if self.draw_ship(list(self.ships.keys())[self.menu_ind]):
+                                self.ships[list(self.ships.keys())[self.menu_ind]] -=  1
+
+                if len(self.ships_coodrinate) == 10:
+                    print('lets go')
+                    self.start_match()
+                else:
+                    help_message = self.first_help_message.get_rect()
+                    help_message.center = (HEIGHT // 2, WIDGHT - 100)
+                    self.game.draw.rect(self.screen, (0, 0, 0), help_message)
+                    self.screen.blit(self.first_help_message, help_message)
+                    self.game.display.update()
+                    self.select_ship()
+                    self.game.display.update()
+
+    def start_match(self):
+        print('im here')
+        exit()
+
+    def choose_positions(self):
+        running = True
+        self.screen.fill(BLACK)
+        self.game.display.update()
+        while running:
+            for event in self.game.event.get():
                 if event.type == self.game.KEYDOWN:
                     if event.key == self.game.K_BACKSPACE:
                         exit()
                     if event.key == self.game.K_w or event.key == self.game.K_UP:
-                        self._switch_ind(-1)
+                        self.opt_ind = self._switch_ind(self.opt_ind, -1, self.choose_optns)
                     if event.key == self.game.K_s or event.key == self.game.K_DOWN:
-                        self._switch_ind(1)
+                        self.opt_ind = self._switch_ind(self.opt_ind, 1, self.choose_optns)
                     if event.key == self.game.K_RETURN:
-                        if self.draw_ship(list(self.ships.keys())[self.menu_ind]):
-                            self.ships[list(self.ships.keys())[self.menu_ind]] -=  1
+                        return self.opt_ind
 
-            self.select_ship()
-            self.game.display.update()
-            if len(self.ships_on_fiend_rect) == 10:
-                print('lets go')
-                exit()
+            self.screen.fill(BLACK)
+            for i, option in enumerate(self.choose_optns):
+                opt_rect = option.get_rect()
+                opt_rect.center = (HEIGHT // 2, (WIDGHT // 2.5) + i * 75)
+                if i == self.opt_ind:
+                    self.game.draw.rect(self.screen, (96, 116, 120), opt_rect)
+                self.screen.blit(option, opt_rect)
+            self.game.display.flip()
 
     def draw_ship(self, ship):
         self.turn = True
@@ -123,13 +177,15 @@ class Game:
                         continue
                     if event.key == self.game.K_RETURN:
                         # coordinate
-                        if self._check_position(cur_pos):
+                        if self._check_position(cur_pos, self.ships_coodrinate):
                             self.ships_on_fiend_rect.append(start_pos)
                             self.ships_coodrinate.append(cur_pos)
                             self.draw_field()
                             self._draw_ships()
+                            self.screen.fill(BLACK, help_mesg)
                             return True
                         else:
+                            self.screen.fill(BLACK, help_mesg)
                             info = self.info.get_rect()
                             info.center = (HEIGHT // 2, WIDGHT - 100)
                             self.game.draw.rect(self.screen, (0, 0, 0), info)
@@ -139,22 +195,135 @@ class Game:
                             self.screen.fill(BLACK, info)
                             self.draw_field()
                             self._draw_ships()
+                            self.screen.fill(BLACK, help_mesg)
                             self.turn = True
 
+            help_mesg = self.first_help_mes_on_field.get_rect()
+            help_mesg.center = (HEIGHT // 1.8, WIDGHT - 100)
+            self.game.draw.rect(self.screen, (0, 0, 0), help_mesg)
+            self.screen.blit(self.first_help_mes_on_field, help_mesg)
+            self.game.display.update()
             self.draw_field()
-            if self._check_position(cur_pos):
+            if self._check_position(cur_pos, self.ships_coodrinate):
                 self.game.draw.rect(self.screen, (0, 255, 55), self.game.Rect(start_pos), 1)
                 self.game.display.update()
             else:
                 self.game.draw.rect(self.screen, (255, 0, 0), self.game.Rect(start_pos), 1)
                 self.game.display.update()
 
-    def reverse_ship(self, coordinate, size):
-        if coordinate[0][0] == 10:
-            return coordinate
-        if coordinate[0][0] < coordinate[1][0]:
-            end = (coordinate[0][0], coordinate[1][1] + (int(size) - 1))
-            return (coordinate[0], end)
+    def generate_ship(self, is_user):
+        x = [i for i in range(1, 11)]
+        y = [i for i in range(1, 11)]
+        for k, v in self.ships.items():
+            for i in range(v):
+                size = k.split('-')[0]
+                coord_x = random.choice(x)
+                coord_y = random.choice(y)
+                reverse = random.choice([1, 0])
+                while True:
+                    res = (self.draw_bot_ship((coord_x, coord_y), int(size), reverse, is_user))
+                    if res:
+                        cur_x, cur_y = res
+                        x[:].remove(cur_x)
+                        y[:].remove(cur_y)
+                        break
+                    else:
+                        coord_x = random.choice(x)
+                        coord_y = random.choice(y)
+        if is_user:
+            for i in range(len(self.ships_on_fiend_rect)):
+                self.ships_on_fiend_rect[i][0] += 1
+                self.ships_on_fiend_rect[i][1] += 1
+                self.ships_on_fiend_rect[i][2] -= 2
+                self.ships_on_fiend_rect[i][3] -= 2
+                self.game.draw.rect(self.screen, (105, 128, 255), self.ships_on_fiend_rect[i])
+                self.game.display.update()
+                sleep(0.1)
+        else:
+            for i in range(len(self.bot_ships_on_field_rect)):
+                self.bot_ships_on_field_rect[i][0] += 1
+                self.bot_ships_on_field_rect[i][1] += 1
+                self.bot_ships_on_field_rect[i][2] -= 2
+                self.bot_ships_on_field_rect[i][3] -= 2
+                self.game.draw.rect(self.screen, (105, 128, 255), self.bot_ships_on_field_rect[i])
+                self.game.display.update()
+                sleep(0.1)
+
+    def draw_bot_ship(self, coordinate, size, is_reverse, is_user):
+        self.draw_field()
+        self.game.display.update()
+        x_coord = coordinate[0]
+        y_coord = coordinate[1]
+        if is_user:
+            x_max = self.left_marg + self.block_size * (self.field_size - 1)
+            y_max = 554
+
+            if is_reverse:
+                x = self.left_marg + (x_coord * self.block_size) - self.block_size
+                y = self.upper_marg + (self.user_size - 2) * self.block_size + y_coord * self.block_size
+                h = self.block_size + 1
+                w = self.block_size * (size) + 1
+
+            else:
+                x = self.left_marg + (x_coord * self.block_size) - self.block_size
+                y = self.upper_marg + (self.user_size - 2) * self.block_size + y_coord * self.block_size
+                h = self.block_size * (size) + 1
+                w = self.block_size + 1
+
+            if y + self.block_size * (size - 1) > y_max:
+                y -= self.block_size * (size - 1)
+
+            if x + self.block_size * (size - 1) > x_max:
+                x -= self.block_size * (size - 1)
+
+            cur_pos = self.game.Rect(x, y, w, h)
+            if is_reverse:
+                ship_coord = ((x // self.block_size, (y  // self.block_size - 1) - (self.user_size - 1)),
+                                            ((x // self.block_size) + size - 1, (y  // self.block_size - 1) - (self.user_size - 1)))
+            else:
+                ship_coord = ((x // self.block_size, (y  // self.block_size - 1) - (self.user_size - 1)),
+                                            ((x // self.block_size), (y  // self.block_size - 1) + size - 1- (self.user_size - 1)))
+            if self._check_position(ship_coord, self.ships_coodrinate):
+                self.ships_coodrinate.append(ship_coord)
+                self.ships_on_fiend_rect.append(cur_pos)
+                x, y = (x // self.block_size, (y  // self.block_size - 1) - (self.user_size - 1))
+                return (x, y)
+            return False
+        else:
+            x_max = self.left_marg + self.block_size * (self.field_size - 1)
+            y_max = self.upper_marg + self.block_size * (self.field_size - 1)
+
+            if is_reverse:
+                x = self.left_marg + (x_coord * self.block_size) - self.block_size
+                y = self.upper_marg + (y_coord * self.block_size) - self.block_size
+                h = self.block_size + 1
+                w = self.block_size * (size) + 1
+
+            else:
+                x = self.left_marg + (x_coord * self.block_size) - self.block_size
+                y = self.upper_marg + (y_coord * self.block_size) - self.block_size
+                h = self.block_size * (size) + 1
+                w = self.block_size + 1
+
+            if y + self.block_size * (size - 1) > y_max:
+                y -= self.block_size * (size - 1)
+
+            if x + self.block_size * (size - 1) > x_max:
+                x -= self.block_size * (size - 1)
+
+            cur_pos = self.game.Rect(x, y, w, h)
+            if is_reverse:
+                ship_coord = ((x // self.block_size, (y  // self.block_size - 1)),
+                                            ((x // self.block_size) + size - 1, (y  // self.block_size - 1)))
+            else:
+                ship_coord = ((x // self.block_size, (y  // self.block_size - 1)),
+                                            ((x // self.block_size), (y  // self.block_size - 1) + size - 1))
+            if self._check_position(ship_coord, self.bot_ships_coodrinate):
+                self.bot_ships_coodrinate.append(ship_coord)
+                self.bot_ships_on_field_rect.append(cur_pos)
+                x, y = (x // self.block_size, (y  // self.block_size - 1))
+                return (x, y)
+            return False
 
     def select_ship(self):
         self.game.draw.rect(self.screen, BLACK, (600, 300, 800, 800))
@@ -171,8 +340,8 @@ class Game:
                 self.game.draw.rect(self.screen, (96, 116, 120), ship_rect)
             self.screen.blit(ship, ship_rect)
 
-    def _check_position(self, ship_coord):
-        for elem in self.ships_coodrinate:
+    def _check_position(self, ship_coord, all_ships):
+        for elem in all_ships:
             for q in range(len(ship_coord)):
                 x, y = ship_coord[q][0], ship_coord[q][1]
                 if (x, y + 1) == elem[0] or (x, y + 1) == elem[1]:
@@ -239,8 +408,9 @@ class Game:
                 elem[3] -= 2
                 self.game.draw.rect(self.screen, (105, 128, 255), elem)
 
-    def _switch_ind(self, num):
-        self.menu_ind = max(0, min(self.menu_ind + num, len(self.ships) - 1))
+    def _switch_ind(self, cur_ind, num, lst):
+        cur_ind = max(0, min(cur_ind + num, len(lst) - 1))
+        return cur_ind
 
 
 class Menu:
