@@ -4,12 +4,23 @@ from time import sleep
 import random
 
 
+class Cofig:
+    def __init__(self) -> None:
+        self.field_size = 10
+        self.block_size = 24
+        self.left_marg = 40
+        self.upper_marg = 50
+        self.user_size = 13
+        self.game = pygame
+        self.screen = pygame.display.set_mode((HEIGHT, WIDGHT), flags=pygame.NOFRAME)
+
+
 class Game:
     def __init__(self, mode) -> None:
         self.turn = True
         self.game = pygame
         self.game.init()
-        self.screen = pygame.display.set_mode((HEIGHT, WIDGHT))#, flags=pygame.NOFRAME)
+        self.screen = pygame.display.set_mode((HEIGHT, WIDGHT), flags=pygame.NOFRAME)
         self.user_fild = self.game.draw.rect(self.screen, (71, 76, 112), (15, 15, 260, 260))
         self.surface = self.game.font.SysFont('arial', 18)
         self.options = self.game.font.SysFont('arial', 30)
@@ -88,7 +99,10 @@ class Game:
                         self.gameplay_ind = self._switch_ind(self.gameplay_ind, 1, self.start_gameplay)
                     if event.key == self.game.K_RETURN:
                         if self.gameplay_ind == 0:
-                            Gameplay(self.mode, self.ships_on_fiend_rect, self.bot_ships_coodrinate).main()
+                            Gameplay(self.mode,
+                                     self.ships_on_fiend_rect,
+                                     self.bot_ships_coodrinate,
+                                     self.ships_coodrinate).main()
                         else:
                             exit()
 
@@ -259,15 +273,15 @@ class Game:
                 self.game.draw.rect(self.screen, (105, 128, 255), self.ships_on_fiend_rect[i])
                 self.game.display.update()
                 sleep(0.01)
-        else:
-            for i in range(len(self.bot_ships_on_field_rect)):
-                self.bot_ships_on_field_rect[i][0] += 1
-                self.bot_ships_on_field_rect[i][1] += 1
-                self.bot_ships_on_field_rect[i][2] -= 2
-                self.bot_ships_on_field_rect[i][3] -= 2
-                self.game.draw.rect(self.screen, (105, 128, 255), self.bot_ships_on_field_rect[i])
-                self.game.display.update()
-                sleep(0.01)
+        # else:
+        #     for i in range(len(self.bot_ships_on_field_rect)):
+        #         self.bot_ships_on_field_rect[i][0] += 1
+        #         self.bot_ships_on_field_rect[i][1] += 1
+        #         self.bot_ships_on_field_rect[i][2] -= 2
+        #         self.bot_ships_on_field_rect[i][3] -= 2
+        #         self.game.draw.rect(self.screen, (105, 128, 255), self.bot_ships_on_field_rect[i])
+        #         self.game.display.update()
+        #         sleep(0.01)
 
     def draw_bot_ship(self, coordinate, size, is_reverse, is_user):
         self.draw_field()
@@ -433,23 +447,31 @@ class Game:
 
 
 class Gameplay(Game):
-    def __init__(self, mode, my_ship_rect, bot_ship_coord) -> None:
+    def __init__(self, mode, my_ship_rect, bot_ship_coord, ships_coord) -> None:
         super().__init__(mode)
         self.mode = mode
-        self.ships_coord = my_ship_rect
+        self.turn = True
+        self.ships_coord_rect = my_ship_rect
+        self.ships_coord_xy = ships_coord
         self.bot_ships_cord = bot_ship_coord
         self.all_bot_coord_ships = []
+        self.all_my_coord_ships = []
         self.missed_positions = []
         self.clear_pos = []
         self.dead_ships = []
+        self.shooted_ships = {}
+        self.bot = Bot(self.all_my_coord_ships)
 
     def main(self):
+
+        self._get_all_coord(self.bot_ships_cord, self.all_bot_coord_ships)
+        self._get_all_coord(self.ships_coord_xy, self.all_my_coord_ships)
+
         self.screen.fill(BLACK)
         x = self.left_marg
         y = self.upper_marg
         h = self.block_size + 1
         w = self.block_size + 1
-        self._get_all_coord()
 
         while True:
             cur_pos = self.game.Rect(x, y, h, w)
@@ -477,8 +499,9 @@ class Gameplay(Game):
                             pass
                         else:
                             y += self.block_size
-                    if event.key == self.game.K_RETURN:
+                    if event.key == self.game.K_RETURN or event.key == self.game.K_SPACE:
                         pos_xy = (x // self.block_size, (y // self.block_size) - 1)
+
                         if cur_pos in self.missed_positions or pos_xy in self.dead_ships:
                             msg = self.warning.get_rect()
                             msg.center = (HEIGHT // 2, WIDGHT - 100)
@@ -501,21 +524,20 @@ class Gameplay(Game):
 
                         res = self.shoot_check((x // self.block_size, (y // self.block_size) - 1))
                         if res == 'kill':
-                            #print(res)
-                            x, y = cur_pos[0], cur_pos[1]
-                            self.game.draw.line(self.screen, (255, 0, 0), (x, y), (x + self.block_size, y + self.block_size))
-                            self.game.draw.line(self.screen, (255, 0, 0), (x + self.block_size, y), (x, y + self.block_size))
-                            self.draw_kils(cur_pos, pos_xy)
                             self.dead_ships.append(pos_xy)
+                            self.draw_kils()
+                            self._draw_dead_ships()
                             self.game.display.update()
                             continue
                         elif res == 'hit':
-                            #print(res)
                             self.game.draw.line(self.screen, (0, 0, 255), (x, y), (x + self.block_size, y + self.block_size))
                             self.game.draw.line(self.screen, (0, 0, 255), (x + self.block_size, y), (x, y + self.block_size))
+                            self.draw_kils()
+                            self._draw_dead_ships()
                             self.game.display.update()
                         else:
                             self.missed_positions.append(cur_pos)
+                            self.bot.main()
 
             self.draw_field()
             self._draw_ships()
@@ -523,130 +545,164 @@ class Gameplay(Game):
             self.game.draw.rect(self.screen, (0, 255, 55), self.game.Rect(cur_pos), 1)
             self.game.display.update()
 
-    def draw_missed_shoots(self):
-        for elem in self.missed_positions:
-            x, y = elem[0], elem[1]
-            self.game.draw.line(self.screen, (255, 0, 255), (x, y), (x + self.block_size, y + self.block_size))
-
-    def draw_kils(self, coord, pos):
-        x, y, w, h  = coord
-        x_pos, y_pos = pos
-        if y_pos == 10 and x_pos == 10:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y -self.block_size, w, h))
-            self.clear_pos.append((x_pos - 1, y_pos))
-            self.clear_pos.append((x_pos - 1, y_pos - 1))
-            self.clear_pos.append((x_pos, y_pos - 1))
-            return
-        if y_pos == 1 and x_pos == 10:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
-            self.clear_pos.append((x_pos - 1, y_pos))
-            self.clear_pos.append((x_pos - 1, y_pos + 1))
-            self.clear_pos.append((x_pos, y_pos + 1))
-            return
-        if y_pos == 1 and x_pos == 1:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
-            self.clear_pos.append((x_pos + 1, y_pos))
-            self.clear_pos.append((x_pos + 1, y_pos + 1))
-            self.clear_pos.append((x_pos, y_pos + 1))
-            return
-        if y_pos == 10 and x_pos == 1:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
-            self.clear_pos.append((x_pos, y_pos - 1))
-            self.clear_pos.append((x_pos + 1, y_pos - 1))
-            self.clear_pos.append((x_pos + 1, y_pos))
-            return
-        if y_pos == 10:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y - self.block_size, w, h))
-            self.clear_pos.append((x_pos - 1, y_pos))
-            self.clear_pos.append((x_pos + 1, y_pos))
-            self.clear_pos.append((x_pos, y_pos - 1))
-            self.clear_pos.append((x_pos + 1, y_pos - 1))
-            self.clear_pos.append((x_pos - 1, y_pos - 1))
-            return
-        if y_pos == 1:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y + self.block_size, w, h))
-            self.clear_pos.append((x_pos - 1, y_pos))
-            self.clear_pos.append((x_pos + 1, y_pos))
-            self.clear_pos.append((x_pos, y_pos + 1))
-            self.clear_pos.append((x_pos + 1, y_pos + 1))
-            self.clear_pos.append((x_pos - 1, y_pos + 1))
-            return
-        if x_pos == 10:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
-            self.clear_pos.append((x_pos, y_pos + 1))
-            self.clear_pos.append((x_pos, y_pos - 1))
-            self.clear_pos.append((x_pos - 1, y_pos - 1))
-            self.clear_pos.append((x_pos - 1, y_pos + 1))
-            self.clear_pos.append((x_pos - 1, y_pos))
-            return
-        if x_pos == 1:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
-            self.clear_pos.append((x_pos, y_pos + 1))
-            self.clear_pos.append((x_pos, y_pos - 1))
-            self.clear_pos.append((x_pos + 1, y_pos - 1))
-            self.clear_pos.append((x_pos + 1, y_pos + 1))
-            self.clear_pos.append((x_pos + 1, y_pos))
-            return
-        else:
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y - self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y + self.block_size, w, h))
-            self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y - self.block_size, w, h))
-            self.clear_pos.append((x_pos - 1, y_pos))
-            self.clear_pos.append((x_pos + 1, y_pos))
-            self.clear_pos.append((x_pos, y_pos - 1))
-            self.clear_pos.append((x_pos, y_pos + 1))
-            self.clear_pos.append((x_pos - 1, y_pos - 1))
-            self.clear_pos.append((x_pos + 1, y_pos + 1))
-            self.clear_pos.append((x_pos - 1, y_pos + 1))
-            self.clear_pos.append((x_pos + 1, y_pos - 1))
-            return
-
-    def shoot_check(self, coord):
+    def shoot_check(self, coord: tuple):
         x, y = coord
         for ship_coord in self.all_bot_coord_ships:
             for cord in ship_coord:
                 if (x, y) == cord and len(ship_coord) == 1:
                     return 'kill'
                 elif (x, y) == cord and len(ship_coord) != 1:
-                    return 'hit'
+                    cut = tuple(ship_coord)
+                    if cut in self.shooted_ships:
+                        self.shooted_ships[cut] += 1
+                        if self.shooted_ships[cut] == len(ship_coord):
+                            for elem in ship_coord:
+                                self.dead_ships.append(elem)
+                            return 'hit'
+                        else:
+                            return 'hit'
+                    else:
+                        self.shooted_ships[cut] = 1
+                        return 'hit'
         return False
 
-    def _get_all_coord(self):
-        for elem in self.bot_ships_cord:
+    def _draw_dead_ships(self):
+        for elem in self.dead_ships:
+            x = ((elem[0] - 1) * self.block_size) + self.left_marg
+            y = ((elem[1] - 1) * self.block_size) + self.upper_marg
+            self.game.draw.rect(self.screen, BLACK, self.game.Rect(x, y, self.block_size + 1, self.block_size + 1))
+            self.game.draw.line(self.screen, (255, 0, 0), (x, y), (x + self.block_size, y + self.block_size))
+            self.game.draw.line(self.screen, (255, 0, 0), (x + self.block_size, y), (x, y + self.block_size))
+            self.game.display.update()
+
+    def draw_missed_shoots(self):
+        for elem in self.missed_positions:
+            x, y = elem[0], elem[1]
+            self.game.draw.line(self.screen, (255, 0, 255), (x, y), (x + self.block_size, y + self.block_size))
+
+    def draw_kils(self):
+        for elem in self.dead_ships:
+
+            x_pos, y_pos = elem
+            x = self.left_marg + (x_pos - 1) * self.block_size
+            y = self.upper_marg + (y_pos - 1) * self.block_size
+            h = self.block_size + 1
+            w = self.block_size + 1
+
+            if y_pos == 10 and x_pos == 10:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y -self.block_size, w, h))
+                self.clear_pos.append((x_pos - 1, y_pos))
+                self.clear_pos.append((x_pos - 1, y_pos - 1))
+                self.clear_pos.append((x_pos, y_pos - 1))
+                continue
+
+            if y_pos == 1 and x_pos == 10:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
+                self.clear_pos.append((x_pos - 1, y_pos))
+                self.clear_pos.append((x_pos - 1, y_pos + 1))
+                self.clear_pos.append((x_pos, y_pos + 1))
+                continue
+
+            if y_pos == 1 and x_pos == 1:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
+                self.clear_pos.append((x_pos + 1, y_pos))
+                self.clear_pos.append((x_pos + 1, y_pos + 1))
+                self.clear_pos.append((x_pos, y_pos + 1))
+                continue
+
+            if y_pos == 10 and x_pos == 1:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
+                self.clear_pos.append((x_pos, y_pos - 1))
+                self.clear_pos.append((x_pos + 1, y_pos - 1))
+                self.clear_pos.append((x_pos + 1, y_pos))
+                continue
+
+            if y_pos == 10:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y - self.block_size, w, h))
+                self.clear_pos.append((x_pos - 1, y_pos))
+                self.clear_pos.append((x_pos + 1, y_pos))
+                self.clear_pos.append((x_pos, y_pos - 1))
+                self.clear_pos.append((x_pos + 1, y_pos - 1))
+                self.clear_pos.append((x_pos - 1, y_pos - 1))
+                continue
+
+            if y_pos == 1:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y + self.block_size, w, h))
+                self.clear_pos.append((x_pos - 1, y_pos))
+                self.clear_pos.append((x_pos + 1, y_pos))
+                self.clear_pos.append((x_pos, y_pos + 1))
+                self.clear_pos.append((x_pos + 1, y_pos + 1))
+                self.clear_pos.append((x_pos - 1, y_pos + 1))
+                continue
+
+            if x_pos == 10:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
+                self.clear_pos.append((x_pos, y_pos + 1))
+                self.clear_pos.append((x_pos, y_pos - 1))
+                self.clear_pos.append((x_pos - 1, y_pos - 1))
+                self.clear_pos.append((x_pos - 1, y_pos + 1))
+                self.clear_pos.append((x_pos - 1, y_pos))
+                continue
+
+            if x_pos == 1:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
+                self.clear_pos.append((x_pos, y_pos + 1))
+                self.clear_pos.append((x_pos, y_pos - 1))
+                self.clear_pos.append((x_pos + 1, y_pos - 1))
+                self.clear_pos.append((x_pos + 1, y_pos + 1))
+                self.clear_pos.append((x_pos + 1, y_pos))
+                continue
+
+            else:
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y - self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x - self.block_size, y + self.block_size, w, h))
+                self.game.draw.rect(self.screen, (23, 76, 79), pygame.Rect(x + self.block_size, y - self.block_size, w, h))
+                self.clear_pos.append((x_pos - 1, y_pos))
+                self.clear_pos.append((x_pos + 1, y_pos))
+                self.clear_pos.append((x_pos, y_pos - 1))
+                self.clear_pos.append((x_pos, y_pos + 1))
+                self.clear_pos.append((x_pos - 1, y_pos - 1))
+                self.clear_pos.append((x_pos + 1, y_pos + 1))
+                self.clear_pos.append((x_pos - 1, y_pos + 1))
+                self.clear_pos.append((x_pos + 1, y_pos - 1))
+                continue
+
+    def _get_all_coord(self, old_coordinate: list, new_coordinate: list):
+        for elem in old_coordinate:
             lst = []
             x_str, y_str = elem[0]
             x_end, y_end = elem[1]
             if (x_str, y_str) == (x_end, y_end):
-                self.all_bot_coord_ships.append([(x_str, y_str)])
+                new_coordinate.append([(x_str, y_str)])
                 continue
             if x_str == x_end:
                 while x_str == x_end:
@@ -659,7 +715,7 @@ class Gameplay(Game):
                         y_str += 1
                 lst.append((x_end, y_end))
                 lst = sorted(set(lst))
-                self.all_bot_coord_ships.append(lst)
+                new_coordinate.append(lst)
             else:
                 while y_str == y_end:
                     lst.append((x_str, y_str))
@@ -671,14 +727,50 @@ class Gameplay(Game):
                         x_str += 1
                 lst.append((x_end, y_end))
                 lst = sorted(set(lst))
-                self.all_bot_coord_ships.append(lst)
+                new_coordinate.append(lst)
 
     def draw_field(self):
         return super().draw_field()
 
     def _draw_ships(self):
-        return super()._draw_ships(self.ships_coord)
+        return super()._draw_ships(self.ships_coord_rect)
 
+
+class Bot(Cofig, Gameplay):
+    def __init__(self, user_ships) -> None:
+        super().__init__()
+        self.all_x = [elem for elem in range(1, 11)]
+        self.all_y = [elem for elem in range(1, 11)]
+        self.user_ships_coordinates = user_ships
+
+    def main(self):
+        print(self.all_x)
+        print(self.all_y)
+        x_cor, y_cor = random.choice(self.all_x), random.choice(self.all_y)
+        print(x_cor, y_cor)
+        x = self.left_marg + (self.block_size * (x_cor - 1))
+        y = self.upper_marg + (12 * self.block_size) + (y_cor - 1) * self.block_size
+
+        cur_pos = (x_cor, y_cor)
+        for elem in self.user_ships_coordinates:
+            if cur_pos in elem:
+                self.game.draw.line(self.screen, (0, 0, 255), (x, y), (x + self.block_size, y + self.block_size))
+                self.game.draw.line(self.screen, (0, 0, 255), (x + self.block_size, y), (x, y + self.block_size))
+                self.all_x.remove(x_cor)
+                self.all_y.remove(y_cor)
+                self.game.display.update()
+                self.main()
+                return
+        self.game.draw.line(self.screen, (255, 0, 255), (x, y), (x + self.block_size, y + self.block_size))
+        self.game.display.update()
+        self.all_x.remove(x_cor)
+        self.all_y.remove(y_cor)
+        return
+
+# x = self.left_marg
+# y = self.upper_marg + 12 * self.block_size
+# h = self.block_size * int(len_ship) + 1
+# w = self.block_size + 1
 
 class Menu:
 
